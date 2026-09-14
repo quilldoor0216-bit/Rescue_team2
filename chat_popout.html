@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BORDER - 팀장 전용 보안 메신저</title>
+    <link rel="stylesheet" href="style.css?v=155">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #121418;
+            color: #eaeaea;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-family: var(--font-main);
+            animation: popoutWindowFade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes popoutWindowFade {
+            0% { opacity: 0; transform: scale(0.98); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .popout-header {
+            padding: 10px 16px;
+            background: #1c2027;
+            border-bottom: 1px solid #2d3442;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #0f1115;
+        }
+        #chat-form {
+            padding: 10px 14px;
+            background: #181b22;
+            border-top: 1px solid #282e3a;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        #chat-input {
+            flex: 1;
+            background: #0d0f12;
+            border: 1px solid #333a48;
+            border-radius: 4px;
+            padding: 9px 12px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 12.5px;
+            outline: none;
+        }
+        #chat-input:focus {
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="popout-header">
+        <div id="chat-title-reset-btn" style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;" title="클릭하여 대화 내역 및 진행 상태 초기화 (처음부터 다시 시작)">
+            <span style="display: inline-block; width: 8px; height: 8px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 6px #4ade80;"></span>
+            <span style="color: #fff; font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">팀장 전용 메신저</span>
+            <span style="display: inline-flex; align-items: center; gap: 3px; color: #94a3b8; font-size: 12px; font-weight: 500; background: rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 10px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                7
+            </span>
+        </div>
+        <div style="font-size: 11px; color: #4ade80; background: rgba(74, 222, 128, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(74, 222, 128, 0.3);">
+            ONLINE
+        </div>
+    </div>
+
+    <div id="chat-messages">
+        <div style="text-align: center; margin: 6px 0;">
+            <span style="font-size: 11px; color: #8892b0; background: rgba(255,255,255,0.04); padding: 4px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: inline-block;">
+                2022년 6월 7일
+            </span>
+        </div>
+    </div>
+
+    <form id="chat-form" autocomplete="off">
+        <input type="file" id="chat-file-input" style="display: none;" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip,.hwp,.xlsx,.csv">
+        <button type="button" id="chat-attach-btn" class="chat-attach-btn" title="사진, 동영상, 파일 첨부 (+)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <input type="text" id="chat-input" placeholder="메시지 입력..." autocomplete="off">
+        <button type="submit" id="chat-send-btn" class="chat-send-btn" title="전송">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform: translateX(1px);"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+    </form>
+
+    <script>
+        const CHAT_SCRIPT = [
+            { sender: '[구조 2팀 한세경]', text: '오늘 대표님이 회식하신다는데.' },
+            { sender: '[조사 2팀 유한별]', text: '네?' },
+            { sender: '[조사 2팀 유한별]', text: '...회식이요?' },
+            { sender: '[구조 2팀 한세경]', text: '아.' },
+            { sender: '[구조 2팀 한세경]', text: '한별 씨는 모르겠구나. 종종 그러셔.' },
+            { sender: '[구조 2팀 한세경]', text: '에휴.' },
+            { sender: '[구조 2팀 한세경]', text: '뭔 회식이야 갑자기...' },
+            { sender: '[연구 1팀 하선우]', text: '음... 연구팀은 일이 생겨서, 오늘 참석은 무리일 것 같네요^^' },
+            { sender: '[구조 2팀 한세경]', text: "봐주는 거 없이 팀장들'만' 전원 참석이라고 하시는데." },
+            { sender: '[조사 2팀 유한별]', text: '왜...일까요.' },
+            { sender: '[조사 2팀 유한별]', text: '혹시 하 팀장님 뭐 하셨나요?' },
+            { sender: '[연구 1팀 하선우]', text: '제가요?' },
+            { sender: '[연구 1팀 하선우]', text: '아니 저 요즘 얌전히 살았다고요.' },
+            { sender: '[구조 2팀 한세경]', text: '?' },
+            { sender: '[구조 2팀 한세경]', text: '?????' },
+            { sender: '[구조 2팀 한세경]', text: '...얌전히?' },
+            { sender: '[구조 2팀 한세경]', text: '얼마 전에 너 때문에 우리 팀 전멸할 뻔했는데 얌전히???' },
+            { sender: '[연구 1팀 하선우]', text: '그으거는-' },
+            { sender: '[연구 1팀 하선우]', text: '조사 중에 착오가 있었다~' },
+            { sender: '[조사 2팀 유한별]', text: '조사요?' },
+            { sender: '[조사 2팀 유한별]', text: '저희는 꼼꼼하게 목숨 걸고 잘 다녀왔습니다만.' },
+            { sender: '[연구 1팀 하선우]', text: '종종 조사 과정에 착오가 생기는 경우가 있는 거죠.' },
+            { sender: '[연구 1팀 하선우]', text: '유 팀장님은 모험심이 없으시잖아요^^' },
+            { sender: '[구조 2팀 한세경]', text: '효율과 안전을 추구한다는 거야.' },
+            { sender: '[구조 2팀 한세경]', text: '싸이코야.' },
+            { sender: '[조사 2팀 유한별]', text: '제 말이요.' },
+            { sender: '[조사 2팀 유한별]', text: '감사합니다, 한 팀장님.' },
+            { sender: '[연구 1팀 하선우]', text: '아무튼.' },
+            { sender: '[연구 1팀 하선우]', text: '회식을 피할 방법을 생각해봤는데요.' },
+            { sender: '[조사 2팀 유한별]', text: '네.' },
+            { sender: '[구조 2팀 한세경]', text: '뭔데.' },
+            { sender: '[연구 1팀 하선우]', text: '재단 건물 내에 이상 현상을 하나 발생시키는 겁니다.' },
+            { sender: '[연구 1팀 하선우]', text: '439같은?' },
+            { sender: '[조사 2팀 유한별]', text: '미치셨어요?' },
+            { sender: '[구조 2팀 한세경]', text: '이 또라이가 뭘 잘못 쳐먹었나' },
+            { sender: '[구조 2팀 한세경]', text: '돌았어? 아주 세상이 빙빙 돌지?' },
+            { sender: '[연구 1팀 하선우]', text: '왜요.' },
+            { sender: '[구조 2팀 한세경]', text: '왜긴 왜야. 몰라서 묻냐?' },
+            { sender: '[구조 2팀 한세경]', text: '어떤 미친 새끼가 인류를 이상체로부터 지키는 조직에서 회식 하나를 피하겠자고 이상 현상을 발생시켜?' },
+            { sender: '[구조 2팀 한세경]', text: '네가 정녕 미쳤지?' },
+            { sender: '[구조 2팀 한세경]', text: '아니 그냥 원래도 미쳐있긴 하니까.' },
+            { sender: '[구조 2팀 한세경]', text: '사상자는, 변질자는.' },
+            { sender: '[구조 2팀 한세경]', text: '니가 감당할거냐??' },
+            { sender: '[연구 1팀 하선우]', text: '아, 그럼요. 이 하선우가 그렇게 멍청한 짓을 저지르겠습니까.' },
+            { sender: '[조사 2팀 유한별]', text: '네.' },
+            { sender: '[조사 2팀 유한별]', text: '정확히는 멍청한보다는 개 썅 미친 짓이지만요.' },
+            { sender: '[연구 1팀 하선우]', text: '아, 좀 상처받을지도요.' },
+            { sender: '[구조 2팀 한세경]', text: '넌 좀 받아라.' },
+            { sender: '[연구 1팀 하선우]', text: '큼.' },
+            { sender: '[연구 1팀 하선우]', text: '아무튼, 439를 117를 통해서 복제를 거치고 약화된 상태의 439를 발동시키는거죠.' },
+            { sender: '[연구 1팀 하선우]', text: '그럼, 사상자도 변질자도 발생하지 않겠죠? 439 자체도 등급도 청이잖아요?' },
+            { sender: '[조사 2팀 유한별]', text: '어느 정도로요?' },
+            { sender: '[구조 2팀 한세경]', text: '한별 씨.' },
+            { sender: '[조사 2팀 유한별]', text: '죄송합니다.' },
+            { sender: '[연구 1팀 하선우]', text: '아, 관심을 주시니까 기쁘게 마저 말하자면요~' },
+            { sender: '[연구 1팀 하선우]', text: '물리적인 피해는 없도록 하고요.' },
+            { sender: '[연구 1팀 하선우]', text: '정신 변질이 발생하더라도 자가 회복 가능한 수준으로 조정하겠습니다.' },
+            { sender: '[연구 1팀 하선우]', text: '범위는 본관 일부.' },
+            { sender: '[연구 1팀 하선우]', text: '지속 시간은 길어도 한 시간 정도.' },
+            { sender: '[조사 2팀 유한별]', text: '한 시간.' },
+            { sender: '[조사 2팀 유한별]', text: '회식이 7시니까 충분하겠네요.' },
+            { sender: '[구조 2팀 한세경]', text: '너 지금 진짜 진지하게 듣고 있지.' },
+            { sender: '[조사 2팀 유한별]', text: '...조금요.' },
+            { sender: '[연구 1팀 하선우]', text: '게다가 제가 현장에서 직접 관리하면—' },
+            { sender: '[처리 2팀 레이븐]', text: '처리팀에서 잔여 현상 정리도 가능합니다.' },
+            { sender: '[구조 2팀 한세경]', text: '레이븐, 언제부터 보고 있었어.' },
+            { sender: '[처리 2팀 레이븐]', text: '조금 전입니다.' },
+            { sender: '[처리 2팀 레이븐]', text: '대화의 흐름을 보니 필요한 것 같아서요.' },
+            { sender: '[연구 1팀 하선우]', text: '보셨죠?' },
+            { sender: '[연구 1팀 하선우]', text: '아주 완벽한 계획입니다.' },
+            { sender: '[조사 2팀 유한별]', text: '생각보다 괜찮은데요.' },
+            { sender: '[구조 2팀 한세경]', text: '안 괜찮아.' },
+            { sender: '[처리 2팀 레이븐]', text: '개인적으로는 상당히 괜찮아 보입니다.' },
+            { sender: '[구조 2팀 한세경]', text: '레이븐까지 왜 그래.' },
+            { sender: '[연구 1팀 하선우]', text: '그럼 지금 발생시키겠습니다.' },
+            { sender: '[구조 2팀 한세경]', text: '안 돼.' },
+            { sender: '[연구 1팀 하선우]', text: '아니 근데 솔직히 대표님이랑 회식이 더 이상 현상 아닙니까.' },
+            { sender: '[조사 2팀 유한별]', text: '동감입니다.' },
+            { sender: '[구조 2팀 한세경]', text: '...그렇게 말하면 할 말이 없는데...' },
+            { sender: '[구조 2팀 한세경]', text: '하...' },
+            { sender: '[구조 2팀 한세경]', text: '그래도 안 돼.' },
+            { sender: '[연구 1팀 하선우]', text: '에라이.' },
+            { sender: '[구조 2팀 한세경]', text: '계산이 아무리 완벽하다고 해도 그건 어디까지나 시뮬레이션이야.' },
+            { sender: '[구조 2팀 한세경]', text: '변수는 언제든지 발생해. 너희도 그걸 알 텐데.' },
+            { sender: '[구조 2팀 한세경]', text: '그리고 그 변수에 제일 먼저 휘말리는 건 현장에 있는 사람들이고.' },
+            { sender: '[연구 1팀 하선우]', text: '...' },
+            { sender: '[조사 2팀 유한별]', text: '맞는 말씀이긴 하네요.' },
+            { sender: '[처리 2팀 레이븐]', text: '동의합니다.' },
+            { sender: '[연구 1팀 하선우]', text: '아~ 회식 한 번 피하기 참 어렵네요.' },
+            { sender: '[구조 2팀 한세경]', text: '그러니까 그냥 가. 두 시간만 참지 뭐.' },
+            { sender: '[조사 2팀 유한별]', text: '...네.' },
+            { sender: '[처리 2팀 레이븐]', text: '알겠습니다.' },
+            { sender: '[연구 1팀 하선우]', text: '아쉽다 정말.' },
+            { sender: '[구조 2팀 한세경]', text: '뭘 아쉬워. 뭘. 어휴... 정말.' }
+        ];
+
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatAttachBtn = document.getElementById('chat-attach-btn');
+        const chatFileInput = document.getElementById('chat-file-input');
+
+        let isBotReplying = false;
+        let scriptTypedCount = 0;
+
+        function getSenderColor(sender) {
+            if (sender.includes('구조') || sender.includes('한세경')) return '#60a5fa'; // 구조팀 (파란색)
+            if (sender.includes('조사') || sender.includes('유한별')) return '#facc15'; // 조사팀 (노란색)
+            if (sender.includes('연구') || sender.includes('하선우')) return '#f87171'; // 연구팀 (붉은색)
+            if (sender.includes('처리') || sender.includes('레이븐')) return '#4ade80'; // 처리팀 (초록색)
+            return '#94a3b8';
+        }
+
+        let chatStartTime = new Date('2022-06-07T04:12:00'); // Fixed start time
+        let chatElapsedMs = 0;
+
+        // Helper to clear persisted app state on each login (mirrors main app)
+        function clearAppState() {
+            try {
+                localStorage.clear();
+            } catch (e) {
+                console.warn('Failed to clear localStorage:', e);
+            }
+        }
+
+        function getTimeString() {
+            const simulated = new Date(chatStartTime.getTime() + chatElapsedMs);
+            const hh = String(simulated.getHours()).padStart(2, '0');
+            const mm = String(simulated.getMinutes()).padStart(2, '0');
+            return `${hh}:${mm}`;
+        }
+
+        function getChatMessageTime(item) {
+            if (item && item.text === '아, 그럼요. 이 하선우가 그렇게 멍청한 짓을 저지르겠습니까.') return '04:13';
+            if (item && item.text === '에라이.') return '04:14';
+            return getTimeString();
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function appendChatMessage(sender, text, timeStr, attachments = [], shouldSave = true) {
+            if (!chatMessages) return;
+
+            const lastMsg = chatMessages.lastElementChild;
+            const isConsecutive = lastMsg && lastMsg.classList && lastMsg.classList.contains('chat-msg-item') && lastMsg.dataset.sender === sender;
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'chat-msg-item';
+            msgDiv.dataset.sender = sender;
+            msgDiv.style.display = 'flex';
+            msgDiv.style.flexDirection = 'column';
+            msgDiv.style.gap = '3px';
+            msgDiv.style.maxWidth = '85%';
+            msgDiv.style.marginTop = isConsecutive ? '2px' : '8px';
+            
+            const isMe = sender.includes('한세경');
+            if (isMe) {
+                msgDiv.style.alignSelf = 'flex-end';
+                msgDiv.style.alignItems = 'flex-end';
+            } else {
+                msgDiv.style.alignSelf = 'flex-start';
+                msgDiv.style.alignItems = 'flex-start';
+            }
+
+            if (!isConsecutive) {
+                const infoDiv = document.createElement('div');
+                infoDiv.style.display = 'flex';
+                infoDiv.style.alignItems = 'center';
+                infoDiv.style.gap = '6px';
+                infoDiv.style.fontSize = '11px';
+                infoDiv.style.color = '#888';
+
+                const senderColor = getSenderColor(sender);
+                if (isMe) {
+                    infoDiv.innerHTML = `<span style="font-size:10px; color:#64748b;">${timeStr}</span><span style="color:${senderColor}; font-weight:bold;">${sender}</span>`;
+                } else {
+                    infoDiv.innerHTML = `<span style="color:${senderColor}; font-weight:bold;">${sender}</span><span style="font-size:10px; color:#64748b;">${timeStr}</span>`;
+                }
+                msgDiv.appendChild(infoDiv);
+            }
+
+            const bubble = document.createElement('div');
+            bubble.style.padding = '8px 12px';
+            bubble.style.borderRadius = isMe 
+                ? (isConsecutive ? '10px 4px 4px 10px' : '10px 10px 2px 10px') 
+                : (isConsecutive ? '4px 10px 10px 4px' : '10px 10px 10px 2px');
+            bubble.style.background = isMe ? 'rgba(37, 99, 235, 0.35)' : 'rgba(255, 255, 255, 0.07)';
+            bubble.style.border = isMe ? '1px solid rgba(59, 130, 246, 0.45)' : '1px solid #2a313d';
+            bubble.style.color = '#f8fafc';
+            bubble.style.fontSize = '13px';
+            bubble.style.wordBreak = 'break-word';
+            bubble.style.lineHeight = '1.45';
+
+            if (text) {
+                const textEl = document.createElement('div');
+                textEl.textContent = text;
+                bubble.appendChild(textEl);
+            }
+
+            if (Array.isArray(attachments) && attachments.length > 0) {
+                attachments.forEach(att => {
+                    if (att.type === 'image') {
+                        const imgWrap = document.createElement('div');
+                        imgWrap.style.marginTop = text ? '6px' : '0';
+                        imgWrap.style.borderRadius = '6px';
+                        imgWrap.style.overflow = 'hidden';
+                        imgWrap.style.border = '1px solid rgba(255,255,255,0.1)';
+                        imgWrap.innerHTML = `<img src="${att.data}" alt="${att.name}" style="width:100%; max-height:220px; object-fit:contain; cursor:pointer; display:block;" onclick="window.open('${att.data}', '_blank')">`;
+                        bubble.appendChild(imgWrap);
+                    } else if (att.type === 'video') {
+                        const vidWrap = document.createElement('div');
+                        vidWrap.style.marginTop = text ? '6px' : '0';
+                        vidWrap.style.borderRadius = '6px';
+                        vidWrap.style.overflow = 'hidden';
+                        vidWrap.style.border = '1px solid rgba(255,255,255,0.1)';
+                        vidWrap.innerHTML = `<video src="${att.data}" controls style="width:100%; max-height:220px; display:block;"></video>`;
+                        bubble.appendChild(vidWrap);
+                    } else {
+                        const fileWrap = document.createElement('a');
+                        fileWrap.href = att.data;
+                        fileWrap.download = att.name;
+                        fileWrap.style.display = 'flex';
+                        fileWrap.style.alignItems = 'center';
+                        fileWrap.style.gap = '8px';
+                        fileWrap.style.padding = '8px 10px';
+                        fileWrap.style.background = 'rgba(0,0,0,0.35)';
+                        fileWrap.style.borderRadius = '6px';
+                        fileWrap.style.marginTop = text ? '6px' : '0';
+                        fileWrap.style.border = '1px solid rgba(255,255,255,0.1)';
+                        fileWrap.style.textDecoration = 'none';
+                        fileWrap.style.color = '#fff';
+                        fileWrap.innerHTML = `
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#e2e8f0;">${att.name}</div>
+                                <div style="font-size:10px; color:#94a3b8;">${formatFileSize(att.size)}</div>
+                            </div>
+                            <span style="font-size:11px; color:#60a5fa; white-space:nowrap; font-weight:bold;">받기</span>
+                        `;
+                        bubble.appendChild(fileWrap);
+                    }
+                });
+            }
+
+            msgDiv.appendChild(bubble);
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            if (shouldSave) {
+                const saved = localStorage.getItem('border_leader_chat_history');
+                let list = [];
+                if (saved) {
+                    try { list = JSON.parse(saved); } catch(e) {}
+                }
+                list.push({ sender, text, time: timeStr, attachments });
+                try {
+                    localStorage.setItem('border_leader_chat_history', JSON.stringify(list));
+                } catch(e) {
+                    console.warn('Storage quota limit reached for attachments', e);
+                }
+            }
+        }
+
+        function getScriptIndex() {
+            const idx = localStorage.getItem('border_script_chat_index');
+            return idx !== null ? parseInt(idx, 10) : 0;
+        }
+
+        function setScriptIndex(idx) {
+            localStorage.setItem('border_script_chat_index', idx);
+        }
+
+        function getNextScriptLine() {
+            const idx = getScriptIndex();
+            if (idx < CHAT_SCRIPT.length && CHAT_SCRIPT[idx].sender.includes('한세경')) {
+                return CHAT_SCRIPT[idx].text;
+            }
+            return null;
+        }
+
+        function onUserType(direction = 1) {
+            const targetLine = getNextScriptLine();
+            if (!targetLine) return;
+
+            if (direction < 0) {
+                scriptTypedCount = Math.max(0, scriptTypedCount - 1);
+            } else {
+                scriptTypedCount = Math.min(targetLine.length, scriptTypedCount + 1);
+            }
+            if (chatInput) {
+                chatInput.value = targetLine.slice(0, scriptTypedCount);
+            }
+        }
+
+        function calculateMessageDelay(text) {
+            const len = text ? text.length : 8;
+            // Slight breathing room between incoming team-leader messages.
+            // Keep typing feel, but slow the overall pace enough to read comfortably.
+            const calculated = 560 + (len * 24) + Math.floor(Math.random() * 140);
+            // Min 650ms, Max 2200ms (2.2초 상한)
+            return Math.min(2200, Math.max(650, calculated));
+        }
+
+        function triggerNextNpcMessages() {
+            let curIndex = getScriptIndex();
+            if (curIndex >= CHAT_SCRIPT.length) {
+                isBotReplying = false;
+                scriptTypedCount = 0;
+                if (chatInput) {
+                    chatInput.placeholder = "메시지 입력...";
+                    chatInput.focus();
+                }
+                return;
+            }
+
+            const nextItem = CHAT_SCRIPT[curIndex];
+            if (!nextItem.sender.includes('한세경')) {
+                isBotReplying = true;
+                if (chatInput) {
+                    chatInput.placeholder = `${nextItem.sender.replace(/[\[\]]/g, '')} 입력 중...`;
+                }
+                const delay = calculateMessageDelay(nextItem.text);
+                setTimeout(() => {
+                    const timeStr = getChatMessageTime(nextItem);
+                    appendChatMessage(nextItem.sender, nextItem.text, timeStr, [], true);
+                    curIndex++;
+                    setScriptIndex(curIndex);
+
+                    if (curIndex < CHAT_SCRIPT.length && !CHAT_SCRIPT[curIndex].sender.includes('한세경')) {
+                        triggerNextNpcMessages();
+                    } else {
+                        isBotReplying = false;
+                        scriptTypedCount = 0;
+                        if (chatInput) {
+                            chatInput.placeholder = "메시지 입력...";
+                            chatInput.value = '';
+                            chatInput.focus();
+                        }
+                    }
+                }, delay);
+            } else {
+                isBotReplying = false;
+                scriptTypedCount = 0;
+                if (chatInput) {
+                    chatInput.placeholder = "메시지 입력...";
+                    chatInput.value = '';
+                    chatInput.focus();
+                }
+            }
+        }
+
+        function advanceChatScript() {
+            if (isBotReplying) return false;
+            let curIndex = getScriptIndex();
+            if (curIndex >= CHAT_SCRIPT.length) return false;
+
+            const curItem = CHAT_SCRIPT[curIndex];
+            const timeStr = getTimeString();
+            appendChatMessage(curItem.sender, curItem.text, timeStr, [], true);
+            curIndex++;
+            setScriptIndex(curIndex);
+            scriptTypedCount = 0;
+
+            triggerNextNpcMessages();
+            return true;
+        }
+
+        function handleSend() {
+            if (isBotReplying) return;
+            const targetLine = getNextScriptLine();
+            if (targetLine) {
+                scriptTypedCount = 0;
+                if (chatInput) chatInput.value = '';
+                advanceChatScript();
+            } else {
+                const text = chatInput ? chatInput.value.trim() : '';
+                if (text) {
+                    if (chatInput) chatInput.value = '';
+                    scriptTypedCount = 0;
+                    const timeStr = getTimeString();
+                    appendChatMessage('[구조 2팀 한세경]', text, timeStr, [], true);
+                }
+            }
+        }
+
+        function loadLeaderChat() {
+            if (!chatMessages) return;
+            isBotReplying = false;
+            scriptTypedCount = 0;
+
+            if (!localStorage.getItem('border_chat_reset_v10')) {
+                localStorage.removeItem('border_leader_chat_history');
+                localStorage.removeItem('border_script_chat_index');
+                localStorage.setItem('border_chat_reset_v10', 'true');
+            }
+            chatMessages.innerHTML = `
+                <div style="text-align: center; margin: 6px 0;">
+                    <span style="font-size: 11px; color: #8892b0; background: rgba(255,255,255,0.04); padding: 4px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: inline-block;">
+                        2022년 6월 7일 화요일
+                    </span>
+                </div>
+            `;
+            const saved = localStorage.getItem('border_leader_chat_history');
+            if (saved) {
+                try {
+                    const msgs = JSON.parse(saved);
+                    if (Array.isArray(msgs)) {
+                        msgs.forEach(m => appendChatMessage(m.sender, m.text, m.time, m.attachments || [], false));
+                    }
+                } catch(e) {}
+            }
+
+            if (chatInput) {
+                chatInput.value = '';
+                chatInput.placeholder = "메시지 입력...";
+                chatInput.focus();
+            }
+        }
+
+        if (chatInput) {
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSend();
+                    return;
+                }
+
+                if (isBotReplying) {
+                    e.preventDefault();
+                    return;
+                }
+
+                const targetLine = getNextScriptLine();
+                if (!targetLine) return; // Finished script -> normal typing
+
+                if (e.key === 'Backspace') {
+                    e.preventDefault();
+                    onUserType(-1);
+                    return;
+                }
+
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', 'Insert', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'].includes(e.key)) {
+                    return;
+                }
+
+                e.preventDefault();
+                onUserType(1);
+            });
+
+            chatInput.addEventListener('input', (e) => {
+                if (isBotReplying) {
+                    chatInput.value = '';
+                    return;
+                }
+                const targetLine = getNextScriptLine();
+                if (!targetLine) return;
+
+                if (chatInput.value !== targetLine.slice(0, scriptTypedCount)) {
+                    if (e.inputType && e.inputType.startsWith('delete')) {
+                        onUserType(-1);
+                    } else {
+                        onUserType(1);
+                    }
+                }
+            });
+        }
+
+        if (chatAttachBtn && chatFileInput) {
+            chatAttachBtn.addEventListener('click', () => {
+                chatFileInput.click();
+            });
+
+            chatFileInput.addEventListener('change', () => {
+                const files = Array.from(chatFileInput.files);
+                if (!files.length) return;
+
+                const promises = files.map(file => {
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            let type = 'file';
+                            if (file.type.startsWith('image/')) type = 'image';
+                            else if (file.type.startsWith('video/')) type = 'video';
+                            resolve({
+                                type,
+                                name: file.name,
+                                size: file.size,
+                                data: e.target.result
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                });
+
+                Promise.all(promises).then(attachments => {
+                    const timeStr = getTimeString();
+                    const text = chatInput ? chatInput.value.trim() : '';
+                    appendChatMessage('[구조 2팀 한세경]', text, timeStr, attachments, true);
+                    if (chatInput) chatInput.value = '';
+                    chatFileInput.value = '';
+                });
+            });
+        }
+
+        function resetChatState() {
+            if (confirm('대화 내역을 초기화하고 처음부터 다시 시작하시겠습니까?')) {
+                localStorage.removeItem('border_leader_chat_history');
+                localStorage.removeItem('border_script_chat_index');
+                isBotReplying = false;
+                scriptTypedCount = 0;
+                
+                if (chatMessages) {
+                    chatMessages.innerHTML = `
+                        <div style="text-align: center; margin: 6px 0;">
+                            <span style="font-size: 11px; color: #8892b0; background: rgba(255,255,255,0.04); padding: 4px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: inline-block;">
+                                2026년 9월 10일 목요일
+                            </span>
+                        </div>
+                    `;
+                }
+                if (chatInput) {
+                    chatInput.value = '';
+                    chatInput.placeholder = "메시지 입력...";
+                    chatInput.focus();
+                }
+                localStorage.setItem('border_chat_reset_trigger', Date.now().toString());
+            }
+        }
+
+        const chatTitleResetBtn = document.getElementById('chat-title-reset-btn');
+        if (chatTitleResetBtn) {
+            chatTitleResetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                resetChatState();
+            });
+        }
+
+        if (chatForm) {
+            chatForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleSend();
+            });
+        }
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'border_chat_reset_trigger') {
+                isBotReplying = false;
+                scriptTypedCount = 0;
+                if (chatMessages) {
+                    chatMessages.innerHTML = `
+                        <div style="text-align: center; margin: 6px 0;">
+                            <span style="font-size: 11px; color: #8892b0; background: rgba(255,255,255,0.04); padding: 4px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: inline-block;">
+                                2026년 9월 10일 목요일
+                            </span>
+                        </div>
+                    `;
+                }
+                if (chatInput) {
+                    chatInput.value = '';
+                    chatInput.placeholder = "메시지 입력...";
+                }
+            } else if (e.key === 'border_leader_chat_history') {
+                const saved = localStorage.getItem('border_leader_chat_history');
+                if (saved && chatMessages) {
+                    chatMessages.innerHTML = `
+                        <div style="text-align: center; margin: 6px 0;">
+                            <span style="font-size: 11px; color: #8892b0; background: rgba(255,255,255,0.04); padding: 4px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: inline-block;">
+                                2026년 9월 10일 목요일
+                            </span>
+                        </div>
+                    `;
+                    try {
+                        const msgs = JSON.parse(saved);
+                        if (Array.isArray(msgs)) {
+                            msgs.forEach(m => appendChatMessage(m.sender, m.text, m.time, m.attachments || [], false));
+                        }
+                    } catch(e) {}
+                }
+            }
+        });
+
+        loadLeaderChat();
+        if (chatInput) chatInput.focus();
+    </script>
+</body>
+</html>
